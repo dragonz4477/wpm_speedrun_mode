@@ -1,0 +1,2 @@
+$ Ignore Save Checksum
+04066284 48000058

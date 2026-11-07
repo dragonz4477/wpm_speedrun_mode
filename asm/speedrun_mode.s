@@ -3,30 +3,21 @@
 ###
 # Constants
 ###
-.set KPAD_BTN_DLEFT,  (1 << 0)
-.set KPAD_BTN_DRIGHT, (1 << 1)
-.set KPAD_BTN_DDOWN,  (1 << 2)
-.set KPAD_BTN_DUP,    (1 << 3)
-.set KPAD_BTN_PLUS,   (1 << 4)
-.set KPAD_BTN_MINUS,  (1 << 12)
 .set KPAD_BTN_1,      (1 << 9)
 .set KPAD_BTN_2,      (1 << 8)
-.set KPAD_BTN_A,      (1 << 11)
-.set KPAD_BTN_B,      (1 << 10)
-.set KPAD_BTN_HOME,   (1 << 15)
+.set SECTION_3_OFFSET, 0x1B060
 
 ###
 # Structure offsets
 ###
-.set KPADStatus_hold, 0x00
 .set Controller_mKPADStatus, 0xA0
-.set Controller_mKPADReadLen, 0xFA0
+.set KPADStatus_hold,        0x00
 
 ###
 # Globals
 ###
-.set g_ppControllers, 0x80265304
-.set g_disableSave,   0x80001500  
+.set g_isSpeedRunMode, 0x80001500  
+.set g_ppControllers,  0x80265304
 
 ###
 #
@@ -35,10 +26,12 @@
 ###
 
 # Register aliases
-.set tmp,         31
-.set pSaveData,   30
-.set pController, 29
-.set held,        28
+.set tmp,           31
+.set pSaveHeader,   30
+.set pSaveSection3, 29
+.set pController,   28
+.set isToggle,      27
+.set isSpeedRun,    26
 
 # Reset button combo
 .set RESET_COMBO, (KPAD_BTN_1 | KPAD_BTN_2)
@@ -49,142 +42,97 @@ __prologue:
   # load controller array
   lis tmp, g_ppControllers@ha
   lwz tmp, g_ppControllers@l(tmp)
+
   # load P1 controller
   lwz pController, 0x0(tmp)
 
   # check for button combo
-  # held = (held & RESET_COMBO) ? 1 : 0
-  lwz held, Controller_mKPADStatus+KPADStatus_hold(pController)
-  andi. tmp, held, RESET_COMBO
-  addi tmp, tmp, -RESET_COMBO
-  cntlzw tmp, tmp
-  srwi. held, tmp, 5 # 2^5 == 32
+  # (held_buttons & RESET_COMBO) == RESET_COMBO ? 1 : 0
+  lwz    tmp, Controller_mKPADStatus + KPADStatus_hold(pController)
+  andi.  tmp, tmp, RESET_COMBO # clear non reset combo bits
+  subi   tmp, tmp, RESET_COMBO # tmp will be zero when the exact buttons are held
+  cntlzw tmp, tmp              # will be 32 when tmp is zero
+  srwi.  isToggle, tmp, 5      # 2^5 == 32, isToggle becomes a boolean
   
-  # modify save file if combo held
-  beq __epilogue
+  # keep the current mode if the button combo is not held
+  beq+ __apply_speedrun_mode_flag
+
+  # toggle the speedrun mode flag
+  lis    tmp, g_isSpeedRunMode@ha
+  lbz    isSpeedRun, g_isSpeedRunMode@l(tmp)
+  cntlzw isSpeedRun, isSpeedRun    # will be 32 when isSpeedRun == false
+  srwi.  isSpeedRun, isSpeedRun, 5 # will be 1 when isSpeedRun == false (inverts the flag)
+  stb    isSpeedRun, g_isSpeedRunMode@l(tmp)
+
+__apply_speedrun_mode_flag:
+  # skip the mod code if not in speedrun mode
+  lis    tmp, g_isSpeedRunMode@ha
+  lbz    isSpeedRun, g_isSpeedRunMode@l(tmp)
+  cmplwi isSpeedRun, 0
+  beq+   __epilogue
+
+  # most values are in section #3 of the save file.
+  # make a pointer to section #3 to reduce the size of the writes that follow.
+  __set tmp, SECTION_3_OFFSET
+  add pSaveSection3, pSaveHeader, tmp
+
   li r0, 0
 
   # Cone Zone
-  __set r31, 0x1BB35
-  stbx r0, r31, r30
+  stb r0, (0x1BB35-SECTION_3_OFFSET)(pSaveSection3)
 
   # Veggie Guardin'
-  __set r31, 0x1BB42
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0F3
-  stbx r0, r31, r30
+  stb r0, (0x1BB42-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0F3-SECTION_3_OFFSET)(pSaveSection3)
 
   # Skip Skimmer
-  __set r31, 0x1BB41
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0EF
-  stbx r0, r31, r30
+  stb r0, (0x1BB41-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0EF-SECTION_3_OFFSET)(pSaveSection3)
 
   # Pose Mii Plus
-  __set r31, 0x1BB3D
-  stbx r0, r31, r30
+  stb r0, (0x1BB3D-SECTION_3_OFFSET)(pSaveSection3)
 
   # Trigger Twist
-  __set r31, 0x1BB43
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0F7
-  stbx r0, r31, r30
+  stb r0, (0x1BB43-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0F7-SECTION_3_OFFSET)(pSaveSection3)
 
   # Jump Park
-  __set r31, 0x1BB36
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0C3
-  stbx r0, r31, r30
-  __set r31, 0x1B107
-  stbx r0, r31, r30
+  stb r0, (0x1BB36-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0C3-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B107-SECTION_3_OFFSET)(pSaveSection3)
 
   # Teeter Targets
-  __set r31, 0x1BB3F
-  stbx r0, r31, r30
-
-  __set r31, 0x2B
-  stbx r0, r31, r30
-  __set r31, 0x3B
-  stbx r0, r31, r30
-  __set r31, 0x1B0E4
-  stbx r0, r31, r30
-  __set r31, 0x1B0E5
-  stbx r0, r31, r30
-  __set r31, 0x1B0E6
-  stbx r0, r31, r30
-  __set r31, 0x1B0E7
-  stbx r0, r31, r30
-  __set r31, 0x1B128
-  stbx r0, r31, r30
-  __set r31, 0x1B129
-  stbx r0, r31, r30
-  __set r31, 0x1B12A
-  stbx r0, r31, r30
-  __set r31, 0x1B12B
-  stbx r0, r31, r30
+  stb r0, (0x1BB3F-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, 0x2B(pSaveHeader)
+  stb r0, 0x3B(pSaveHeader)
+  stw r0, (0x1B0E4-SECTION_3_OFFSET)(pSaveSection3) # 0x1B0E4 - 0x1B0E7
+  stw r0, (0x1B128-SECTION_3_OFFSET)(pSaveSection3) # 0x1B128 - 0x1B12B
 
   # Spooky Search
-  __set r31, 0x1BB34
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0BB
-  stbx r0, r31, r30
+  stb r0, (0x1BB34-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0BB-SECTION_3_OFFSET)(pSaveSection3)
 
   # Wind Runner
-  __set r31, 0x1BB3E
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0E3
-  stbx r0, r31, r30
-  __set r31, 0x1B127
-  stbx r0, r31, r30
+  stb r0, (0x1BB3E-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0E3-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B127-SECTION_3_OFFSET)(pSaveSection3)
 
   # Treasure Twirl
-  __set r31, 0x1BB3A
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0D3
-  stbx r0, r31, r30
-  __set r31, 0x1B117
-  stbx r0, r31, r30
+  stb r0, (0x1BB3A-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0D3-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B117-SECTION_3_OFFSET)(pSaveSection3)
 
   # Flutter Fly
-  __set r31, 0x1BB3C
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0DB
-  stbx r0, r31, r30
+  stb r0, (0x1BB3C-SECTION_3_OFFSET)(pSaveSection3)
+  stb r0, (0x1B0DB-SECTION_3_OFFSET)(pSaveSection3)
 
   # Star Shuttle
-  __set r31, 0x1BB37
-  stbx r0, r31, r30
-
-  __set r31, 0x1B0C4
-  stbx r0, r31, r30
-  __set r31, 0x1B0C5
-  stbx r0, r31, r30
-  __set r31, 0x1B0C6
-  stbx r0, r31, r30
-  __set r31, 0x1B0C7
-  stbx r0, r31, r30
-  __set r31, 0x1B108
-  stbx r0, r31, r30
-  __set r31, 0x1B109
-  stbx r0, r31, r30
-  __set r31, 0x1B10A
-  stbx r0, r31, r30
-  __set r31, 0x1B10B
-  stbx r0, r31, r30
+  stb r0, (0x1BB37-SECTION_3_OFFSET)(pSaveSection3)
+  stw r0, (0x1B0C4-SECTION_3_OFFSET)(pSaveSection3) # 0x1B0C4-0x1B0C7
+  stw r0, (0x1B108-SECTION_3_OFFSET)(pSaveSection3) # 0x1B108-0x1B10B
 
 __epilogue:
-  # signal to save disable code
-  lis tmp, g_disableSave@ha
-  stb held, g_disableSave@l(tmp)
-
   __pop_stack r3 0x100 true
+
   # return 0 (save file is OK)
   li r3, 0

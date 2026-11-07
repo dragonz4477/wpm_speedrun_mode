@@ -3,7 +3,7 @@
 ###
 # Globals
 ###
-.set g_disableSave, 0x80001500
+.set g_isSpeedRunMode, 0x80001500
 
 ###
 #
@@ -11,5 +11,6 @@
 #
 ###
 
-lis r3, g_disableSave@ha
-lbz r3, g_disableSave@l(r3)
+# the inject address lets this flag also become a boolean of whether to abort saving
+lis r3, g_isSpeedRunMode@ha
+lbz r3, g_isSpeedRunMode@l(r3)
