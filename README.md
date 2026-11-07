@@ -10,4 +10,4 @@ when loading into the game (either initially from the wii menu or on reset), hol
 you are required to have a homebrewed wii/vwii with [gecko os](https://wiibrew.org/wiki/Gecko_OS) installed (ensure sd cheats are turned on in gecko settings). go to the [releases](https://github.com/dragonz4477/wpm_speedrun_mode/releases) tab, download one of the .gct files, and save it to a folder called `codes` at the root of your sd card. if you are running the **ntsc-u** version of the game, download `SC8E01.gct`. if you are running the **pal** version of the game, download `SC8P01.gct`. launch the game through gecko and it should work just fine.
 
 ## special thanks
-thank you to [kiwi](https://github.com/kiwi515) for the button combo and disable save logic
+thank you to [kiwi](https://github.com/kiwi515) for the button combo and disable save logic, as well as finding the bug in gecko that made this crash on reset LOL
