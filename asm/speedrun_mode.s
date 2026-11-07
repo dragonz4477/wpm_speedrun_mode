@@ -6,6 +6,7 @@
 .set KPAD_BTN_1,      (1 << 9)
 .set KPAD_BTN_2,      (1 << 8)
 .set SECTION_3_OFFSET, 0x1B060
+.set OS_APP_TYPE_DVD,  0x80
 
 ###
 # Structure offsets
@@ -16,8 +17,9 @@
 ###
 # Globals
 ###
-.set g_isSpeedRunMode, 0x80001500  
-.set g_ppControllers,  0x80265304
+.set OS_CURRENT_APP_TYPE, 0x80003184
+.set g_isSpeedRunMode,    0x80001500  
+.set g_ppControllers,     0x80265304
 
 ###
 #
@@ -38,6 +40,13 @@
 
 __prologue:
   __push_stack r3 0x100 true
+
+  # OSRestart needs to read the current app type.
+  # gecko os doesn't set this value in the apploader,
+  # so we have to do it manually.
+  __set tmp, OS_CURRENT_APP_TYPE
+  li r0, OS_APP_TYPE_DVD
+  stb r0, 0(tmp)
 
   # load controller array
   lis tmp, g_ppControllers@ha
